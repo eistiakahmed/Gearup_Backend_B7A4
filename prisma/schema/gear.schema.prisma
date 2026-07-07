@@ -1,0 +1,50 @@
+// Gear inventory and category management
+// Handles sports equipment and outdoor gear listings
+
+
+model Category {
+  id          String    @id @default(uuid())
+  name        String    @unique
+  description String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Relations
+  gearItems   GearItem[]
+
+  @@map("categories")
+}
+
+model GearItem {
+  id              String    @id @default(uuid())
+  name            String
+  description     String
+  brand           String
+  model           String?
+  serialNumber    String?   @unique
+  category        Category  @relation(fields: [categoryId], references: [id])
+  categoryId      String
+  provider        User      @relation(fields: [providerId], references: [id])
+  providerId      String
+  dailyRate       Decimal   @db.Decimal(10, 2)
+  weeklyRate      Decimal?  @db.Decimal(10, 2)
+  monthlyRate     Decimal?  @db.Decimal(10, 2)
+  depositAmount   Decimal?  @db.Decimal(10, 2)
+  specifications  Json?     // Flexible field for gear specs
+  images          String[]  // Array of image URLs
+  isAvailable     Boolean   @default(true)
+  stockQuantity   Int       @default(1)
+  currentStock    Int       @default(1)
+  location        String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // Relations
+  rentalOrders    RentalOrderItem[]
+  reviews         Review[]
+
+  @@index([categoryId])
+  @@index([providerId])
+  @@index([isAvailable])
+  @@map("gear_items")
+}
