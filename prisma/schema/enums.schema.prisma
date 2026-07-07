@@ -1,0 +1,46 @@
+// Enum definitions for the GearUp platform
+// These enums define the core values used across multiple models
+
+/**
+ * User roles in the system
+ * Determines access permissions and capabilities
+ */
+enum UserRole {
+  CUSTOMER
+  PROVIDER
+  ADMIN
+}
+
+/**
+ * Rental order status workflow
+ * Defines the lifecycle of a rental order
+ * Progress: PLACED → CONFIRMED → PAID → PICKED_UP → RETURNED
+ * Cancellation: Available from PLACED or CONFIRMED status
+ */
+enum OrderStatus {
+  PLACED
+  CONFIRMED
+  PAID
+  PICKED_UP
+  RETURNED
+  CANCELLED
+}
+
+/**
+ * Payment transaction status
+ * Tracks the lifecycle of payment processing
+ */
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+/**
+ * Available payment gateway methods
+ * Defines supported payment providers
+ */
+enum PaymentMethod {
+  STRIPE
+}
