@@ -1,0 +1,24 @@
+// Payment processing and tracking
+// Handles payment transactions with multiple payment gateways
+
+
+model Payment {
+  id              String        @id @default(uuid())
+  transactionId   String        @unique
+  order           RentalOrder   @relation(fields: [orderId], references: [id])
+  orderId         String
+  user            User          @relation(fields: [userId], references: [id])
+  userId          String
+  amount          Decimal       @db.Decimal(10, 2)
+  method          PaymentMethod
+  status          PaymentStatus @default(PENDING)
+  providerResponse Json?        // Store payment gateway response
+  paidAt          DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@index([orderId])
+  @@index([userId])
+  @@index([status])
+  @@map("payments")
+}

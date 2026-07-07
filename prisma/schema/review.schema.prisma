@@ -1,0 +1,23 @@
+// Customer review system
+// Handles post-rental feedback and ratings
+
+
+
+model Review {
+  id              String      @id @default(uuid())
+  rating          Int         // 1-5 stars
+  comment         String?
+  gear            GearItem    @relation(fields: [gearId], references: [id])
+  gearId          String
+  user            User        @relation(fields: [userId], references: [id])
+  userId          String
+  order           RentalOrder @relation(fields: [orderId], references: [id])
+  orderId         String
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  @@index([gearId])
+  @@index([userId])
+  @@index([rating])
+  @@map("reviews")
+}
