@@ -1,0 +1,47 @@
+// Rental order management
+// Handles gear rental transactions and order lifecycle
+
+
+model RentalOrder {
+  id              String      @id @default(uuid())
+  orderNumber     String      @unique
+  customer        User        @relation(fields: [customerId], references: [id])
+  customerId      String
+  startDate       DateTime
+  endDate         DateTime
+  totalDays       Int
+  totalAmount     Decimal     @db.Decimal(10, 2)
+  depositAmount   Decimal?    @db.Decimal(10, 2)
+  status          OrderStatus @default(PLACED)
+  notes           String?
+  pickupAddress   String?
+  returnAddress   String?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  // Relations
+  items           RentalOrderItem[]
+  payments        Payment[]
+  reviews         Review[]
+
+  @@index([customerId])
+  @@index([status])
+  @@index([startDate])
+  @@map("rental_orders")
+}
+
+model RentalOrderItem {
+  id              String      @id @default(uuid())
+  order           RentalOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderId         String
+  gear            GearItem    @relation(fields: [gearId], references: [id])
+  gearId          String
+  quantity        Int         @default(1)
+  dailyRate       Decimal     @db.Decimal(10, 2)
+  totalAmount     Decimal     @db.Decimal(10, 2)
+  createdAt       DateTime    @default(now())
+
+  @@index([orderId])
+  @@index([gearId])
+  @@map("rental_order_items")
+}
