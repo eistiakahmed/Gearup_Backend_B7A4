@@ -4,11 +4,11 @@
 
 **A Production-Ready Backend for Sports & Outdoor Gear Rentals**
 
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue)](https://www.typescriptlang.org/)
-[![Node.js](https://img.shields.io/badge/Node.js-18+-green)](https://nodejs.org/)
-[![Express](https://img.shields.io/badge/Express-5.0-lightgrey)](https://expressjs.com/)
-[![Prisma](https://img.shields.io/badge/Prisma-7.0-2D3748)](https://www.prisma.io/)
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15-336791)](https://www.postgresql.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-blue)](https://www.typescriptlang.org/)
+[![Node.js](https://img.shields.io/badge/Node.js-green)](https://nodejs.org/)
+[![Express](https://img.shields.io/badge/Express-lightgrey)](https://expressjs.com/)
+[![Prisma](https://img.shields.io/badge/Prisma-2D3748)](https://www.prisma.io/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-336791)](https://www.postgresql.org/)
 [![License](https://img.shields.io/badge/License-ISC-orange)](LICENSE.md)
 
 [Features](#-features) • [Quick Start](#-quick-start) • [API Documentation](#-api-documentation) • [Architecture](#-architecture) • [Deployment](#-deployment)
