@@ -4,13 +4,18 @@ import {
   confirmPayment,
   getUserPayments,
   getPaymentById,
+  handleStripeWebhook,
+  cleanupExpiredPayments,
 } from './payment.controller';
-import { createPaymentValidation, confirmPaymentValidation } from './payment.validator';
+import { createPaymentValidation, confirmPaymentValidation, paymentQueryValidation } from './payment.validator';
 import { authenticate } from '../../middlewares/auth.middleware';
-import { customerOnly } from '../../middlewares/role.middleware';
+import { customerOnly, adminOnly } from '../../middlewares/role.middleware';
 import { handleValidationErrors } from '../../middlewares/validation.middleware';
 
 const router = Router();
+
+// Public webhook endpoint (no authentication required - Stripe calls this)
+router.post('/webhook/stripe', handleStripeWebhook);
 
 // Authenticated routes
 router.use(authenticate);
@@ -30,11 +35,18 @@ router.post('/create', customerOnly, createPaymentValidation, handleValidationEr
 router.post('/confirm', customerOnly, confirmPaymentValidation, handleValidationErrors, confirmPayment);
 
 /**
+ * @route   POST /api/payments/cleanup/expired
+ * @desc    Clean up expired payments
+ * @access  Admin
+ */
+router.post('/cleanup/expired', adminOnly, cleanupExpiredPayments);
+
+/**
  * @route   GET /api/payments
  * @desc    Get user's payment history
  * @access  Customer
  */
-router.get('/', customerOnly, getUserPayments);
+router.get('/', customerOnly, paymentQueryValidation, handleValidationErrors, getUserPayments);
 
 /**
  * @route   GET /api/payments/:id

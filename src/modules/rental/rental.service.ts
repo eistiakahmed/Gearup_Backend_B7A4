@@ -70,8 +70,8 @@ export const createRentalOrderService = async (data: CreateRentalOrderData) => {
         throw new Error(`Gear item "${gear.name}" is not available for rent`);
       }
 
-      if (gear.currentStock < item.quantity) {
-        throw new Error(`Insufficient stock for "${gear.name}". Available: ${gear.currentStock}, Requested: ${item.quantity}`);
+      if (gear.stockQuantity < item.quantity) {
+        throw new Error(`Insufficient stock for "${gear.name}". Total available capacity: ${gear.stockQuantity}, Requested: ${item.quantity}`);
       }
 
       return {
@@ -331,13 +331,15 @@ export const updateOrderStatusService = async (
   }
 
   // Validate status transitions
+  // Proper flow: PLACED → CONFIRMED → PAID → PICKED_UP → RETURNED
+  // Cancellation allowed from PLACED and CONFIRMED
   const validTransitions: Record<OrderStatus, OrderStatus[]> = {
-    [OrderStatus.PLACED]: ['CONFIRMED', 'CANCELLED'],
-    [OrderStatus.CONFIRMED]: ['PAID', 'CANCELLED'],
-    [OrderStatus.PAID]: ['PICKED_UP'],
-    [OrderStatus.PICKED_UP]: ['RETURNED'],
-    [OrderStatus.RETURNED]: [],
-    [OrderStatus.CANCELLED]: [],
+    [OrderStatus.PLACED]: ['CONFIRMED', 'CANCELLED'], // Customer can place order, provider confirms, or customer cancels
+    [OrderStatus.CONFIRMED]: ['PAID', 'CANCELLED'],    // Payment completes → PAID, or provider cancels
+    [OrderStatus.PAID]: ['PICKED_UP'],                // Provider marks as picked up after payment
+    [OrderStatus.PICKED_UP]: ['RETURNED'],           // Provider marks as returned
+    [OrderStatus.RETURNED]: [],                      // Terminal state
+    [OrderStatus.CANCELLED]: [],                     // Terminal state
   };
 
   const allowedStatuses = validTransitions[existingOrder.status] ?? [];

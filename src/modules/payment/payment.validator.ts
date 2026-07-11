@@ -1,4 +1,4 @@
-import { body, ValidationChain } from 'express-validator';
+import { body, query, ValidationChain } from 'express-validator';
 
 /**
  * Validation rules for creating payment
@@ -55,35 +55,35 @@ export const confirmPaymentValidation: ValidationChain[] = [
  * Validation rules for payment query parameters
  */
 export const paymentQueryValidation: ValidationChain[] = [
-  body('status')
+  query('status')
     .optional()
     .trim()
     .isIn(['PENDING', 'COMPLETED', 'FAILED', 'REFUNDED'])
     .withMessage('Status must be one of: PENDING, COMPLETED, FAILED, REFUNDED'),
 
-  body('method')
+  query('method')
     .optional()
     .trim()
     .isIn(['STRIPE'])
     .withMessage('Method must be STRIPE'),
 
-  body('page')
+  query('page')
     .optional()
     .isInt({ min: 1 })
     .withMessage('Page number must be at least 1'),
 
-  body('limit')
+  query('limit')
     .optional()
     .isInt({ min: 1, max: 100 })
     .withMessage('Limit must be between 1 and 100'),
 
-  body('sortBy')
+  query('sortBy')
     .optional()
     .trim()
     .isIn(['createdAt', 'amount', 'status'])
     .withMessage('Sort by must be one of: createdAt, amount, status'),
 
-  body('sortOrder')
+  query('sortOrder')
     .optional()
     .trim()
     .isIn(['asc', 'desc'])

@@ -8,9 +8,9 @@ import {
   updateGear,
   deleteGear,
 } from './gear.controller';
-import { createGearValidation, updateGearValidation } from './gear.validator';
+import { createGearValidation, updateGearValidation, gearQueryValidation } from './gear.validator';
 import { authenticate, optionalAuth } from '../../middlewares/auth.middleware';
-import { providerOnly, adminOnly } from '../../middlewares/role.middleware';
+import { providerOnly, adminOnly, providerOrAdmin } from '../../middlewares/role.middleware';
 import { handleValidationErrors } from '../../middlewares/validation.middleware';
 
 const router = Router();
@@ -20,14 +20,14 @@ const router = Router();
  * @desc    Get all gear items with filtering and pagination
  * @access  Public (with optional auth for personalized results)
  */
-router.get('/', optionalAuth, getAllGear);
+router.get('/', optionalAuth, gearQueryValidation, handleValidationErrors, getAllGear);
 
 /**
  * @route   GET /api/gear/search
  * @desc    Search gear items
  * @access  Public
  */
-router.get('/search', optionalAuth, getAllGear);
+router.get('/search', optionalAuth, gearQueryValidation, handleValidationErrors, getAllGear);
 
 /**
  * @route   GET /api/gear/:id
@@ -49,5 +49,45 @@ router.get('/categories/all', getAllCategories);
  * @access  Public
  */
 router.get('/categories/:id', getCategoryById);
+
+/**
+ * @route   POST /api/gear
+ * @desc    Create new gear item
+ * @access  Provider/Admin
+ */
+router.post(
+  '/',
+  authenticate,
+  providerOrAdmin,
+  createGearValidation,
+  handleValidationErrors,
+  createGear
+);
+
+/**
+ * @route   PUT /api/gear/:id
+ * @desc    Update gear item
+ * @access  Provider/Admin
+ */
+router.put(
+  '/:id',
+  authenticate,
+  providerOrAdmin,
+  updateGearValidation,
+  handleValidationErrors,
+  updateGear
+);
+
+/**
+ * @route   DELETE /api/gear/:id
+ * @desc    Delete gear item
+ * @access  Provider/Admin
+ */
+router.delete(
+  '/:id',
+  authenticate,
+  providerOrAdmin,
+  deleteGear
+);
 
 export default router;

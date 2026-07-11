@@ -7,7 +7,7 @@ import {
   deleteReview,
   getUserReviews,
 } from './review.controller';
-import { createReviewValidation } from './review.validator';
+import { createReviewValidation, reviewQueryValidation } from './review.validator';
 import { authenticate } from '../../middlewares/auth.middleware';
 import { customerOnly } from '../../middlewares/role.middleware';
 import { handleValidationErrors } from '../../middlewares/validation.middleware';
@@ -19,7 +19,7 @@ const router = Router();
  * @desc    Get reviews for a gear item
  * @access  Public
  */
-router.get('/gear/:gearId', getGearReviews);
+router.get('/gear/:gearId', reviewQueryValidation, handleValidationErrors, getGearReviews);
 
 /**
  * @route   GET /api/reviews/:id
@@ -43,7 +43,7 @@ router.post('/', customerOnly, createReviewValidation, handleValidationErrors, c
  * @desc    Get user's reviews
  * @access  Customer
  */
-router.get('/user/me', customerOnly, getUserReviews);
+router.get('/user/me', customerOnly, reviewQueryValidation, handleValidationErrors, getUserReviews);
 
 /**
  * @route   PATCH /api/reviews/:id
@@ -52,11 +52,6 @@ router.get('/user/me', customerOnly, getUserReviews);
  */
 router.patch('/:id', customerOnly, updateReview);
 
-/**
- * @route   DELETE /api/reviews/:id
- * @desc    Delete review
- * @access  Customer (owner only) / Admin
- */
-router.delete('/:id', customerOnly, deleteReview);
+router.delete('/:id', deleteReview);
 
 export default router;

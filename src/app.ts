@@ -7,9 +7,11 @@ import adminRoutes from './modules/admin/admin.routes';
 import authRoutes from './modules/auth/auth.routes';
 import gearRoutes from './modules/gear/gear.routes';
 import paymentRoutes from './modules/payment/payment.routes';
+import providerRoutes from './modules/provider/provider.routes';
 import rentalRoutes from './modules/rental/rental.routes';
 import reviewRoutes from './modules/review/review.routes';
 import { sendError } from './utils/apiResponse.util';
+import config from './config/env.config';
 
 // Create Express app
 const app: Application = express();
@@ -25,30 +27,49 @@ const corsOptions = {
   allowedHeaders: ['Content-Type', 'Authorization'],
 };
 app.use(cors(corsOptions));
+// Request logging middleware (all environments)
+app.use((req: Request, res: Response, next: NextFunction) => {
+  console.log(`${req.method} ${req.path} - ${new Date().toISOString()}`);
+  next();
+});
 
-// Body parsing middleware
-app.use(express.json({ limit: '10mb' }));
+// Body parsing middleware (captures raw body for Stripe webhook signature verification)
+app.use(
+  express.json({
+    limit: '10mb',
+    verify: (req: any, _res, buf) => {
+      if (req.originalUrl && req.originalUrl.includes('/webhook/stripe')) {
+        req.rawBody = buf;
+      }
+    },
+  })
+);
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Cookie parser middleware
 app.use(cookieParser());
 
-// Request logging middleware (development only)
-if (process.env.NODE_ENV === 'development') {
-  app.use((req: Request, res: Response, next: NextFunction) => {
-    console.log(`${req.method} ${req.path} - ${new Date().toISOString()}`);
-    next();
-  });
-}
-
-// Health check endpoint
-app.get('/health', (_req: Request, res: Response) => {
-  res.status(200).json({
-    success: true,
-    message: 'GearUp API is running',
-    timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV || 'development',
-  });
+// Health check endpoint with database connectivity check
+app.get('/health', async (_req: Request, res: Response) => {
+  try {
+    const { prisma } = await import('./config/database');
+    await prisma.$queryRaw`SELECT 1`;
+    res.status(200).json({
+      success: true,
+      message: 'GearUp API is running',
+      database: 'connected',
+      timestamp: new Date().toISOString(),
+      environment: process.env.NODE_ENV || 'development',
+    });
+  } catch (error) {
+    console.error('Health check database error:', error);
+    res.status(503).json({
+      success: false,
+      message: 'GearUp API is running but database is disconnected',
+      database: 'disconnected',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
 });
 
 // API Documentation
@@ -67,7 +88,12 @@ app.use('/api/gear', gearRoutes);
 app.use('/api/rentals', rentalRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/reviews', reviewRoutes);
+app.use('/api/provider', providerRoutes);
 app.use('/api/admin', adminRoutes);
+
+// Public Category Endpoint
+import { getAllCategories } from './modules/gear/gear.controller';
+app.get('/api/categories', getAllCategories);
 
 // 404 handler - must be after all routes
 app.use((req: Request, res: Response) => {

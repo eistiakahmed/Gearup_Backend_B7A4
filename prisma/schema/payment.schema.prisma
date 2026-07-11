@@ -14,11 +14,13 @@ model Payment {
   status          PaymentStatus @default(PENDING)
   providerResponse Json?        // Store payment gateway response
   paidAt          DateTime?
+  expiresAt       DateTime?    // Payment expiration time
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
 
   @@index([orderId])
   @@index([userId])
   @@index([status])
+  @@index([expiresAt])
   @@map("payments")
 }

@@ -1,4 +1,4 @@
-import { body, ValidationChain } from 'express-validator';
+import { body, query, ValidationChain } from 'express-validator';
 
 /**
  * Validation rules for creating a review
@@ -29,34 +29,34 @@ export const createReviewValidation: ValidationChain[] = [
  * Validation rules for review query parameters
  */
 export const reviewQueryValidation: ValidationChain[] = [
-  body('gearId')
+  query('gearId')
     .optional()
     .trim()
     .isUUID()
     .withMessage('Invalid gear ID'),
 
-  body('rating')
+  query('rating')
     .optional()
     .isInt({ min: 1, max: 5 })
     .withMessage('Rating filter must be between 1 and 5'),
 
-  body('page')
+  query('page')
     .optional()
     .isInt({ min: 1 })
     .withMessage('Page number must be at least 1'),
 
-  body('limit')
+  query('limit')
     .optional()
     .isInt({ min: 1, max: 100 })
     .withMessage('Limit must be between 1 and 100'),
 
-  body('sortBy')
+  query('sortBy')
     .optional()
     .trim()
     .isIn(['createdAt', 'rating'])
     .withMessage('Sort by must be one of: createdAt, rating'),
 
-  body('sortOrder')
+  query('sortOrder')
     .optional()
     .trim()
     .isIn(['asc', 'desc'])

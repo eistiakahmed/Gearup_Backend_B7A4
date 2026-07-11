@@ -1,4 +1,4 @@
-import { body, ValidationChain } from 'express-validator';
+import { body, query, ValidationChain } from 'express-validator';
 
 /**
  * Validation rules for creating a rental order
@@ -87,39 +87,39 @@ export const updateOrderStatusValidation: ValidationChain[] = [
  * Validation rules for rental query parameters
  */
 export const rentalQueryValidation: ValidationChain[] = [
-  body('status')
+  query('status')
     .optional()
     .trim()
     .isIn(['PLACED', 'CONFIRMED', 'PAID', 'PICKED_UP', 'RETURNED', 'CANCELLED'])
     .withMessage('Status filter must be a valid order status'),
 
-  body('startDate')
+  query('startDate')
     .optional()
     .isISO8601()
     .withMessage('Start date filter must be a valid ISO 8601 date'),
 
-  body('endDate')
+  query('endDate')
     .optional()
     .isISO8601()
     .withMessage('End date filter must be a valid ISO 8601 date'),
 
-  body('page')
+  query('page')
     .optional()
     .isInt({ min: 1 })
     .withMessage('Page number must be at least 1'),
 
-  body('limit')
+  query('limit')
     .optional()
     .isInt({ min: 1, max: 100 })
     .withMessage('Limit must be between 1 and 100'),
 
-  body('sortBy')
+  query('sortBy')
     .optional()
     .trim()
     .isIn(['createdAt', 'startDate', 'totalAmount', 'status'])
     .withMessage('Sort by must be one of: createdAt, startDate, totalAmount, status'),
 
-  body('sortOrder')
+  query('sortOrder')
     .optional()
     .trim()
     .isIn(['asc', 'desc'])

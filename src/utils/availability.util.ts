@@ -1,5 +1,6 @@
 import { OrderStatus } from '../../generated/prisma/enums';
 import { prisma } from '../config/database';
+import { Prisma } from '../../generated/prisma/client';
 
 export interface AvailabilityCheck {
   gearId: string;
@@ -102,7 +103,7 @@ export const checkAvailability = async (checks: AvailabilityCheck[]): Promise<Av
       );
 
       // Calculate available quantity
-      const availableQuantity = Math.max(0, gearItem.currentStock - conflictingQuantity);
+      const availableQuantity = Math.max(0, gearItem.stockQuantity - conflictingQuantity);
 
       return {
         gearId,
@@ -212,14 +213,17 @@ export const calculateRentalPricing = (
 export const updateGearStockForOrder = async (
   orderId: string,
   newStatus: OrderStatus,
-  oldStatus?: OrderStatus
+  oldStatus?: OrderStatus,
+  tx?: Prisma.TransactionClient
 ): Promise<void> => {
   if (!oldStatus || oldStatus === newStatus) {
     return;
   }
 
+  const db = tx || prisma;
+
   // Get all order items
-  const orderItems = await prisma.rentalOrderItem.findMany({
+  const orderItems = await db.rentalOrderItem.findMany({
     where: { orderId },
     include: {
       gear: true,
@@ -242,7 +246,7 @@ export const updateGearStockForOrder = async (
     }
 
     if (stockAdjustment !== 0) {
-      await prisma.gearItem.update({
+      await db.gearItem.update({
         where: { id: gear.id },
         data: {
           currentStock: Math.max(0, gear.currentStock + stockAdjustment),

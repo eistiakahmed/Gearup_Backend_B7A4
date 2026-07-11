@@ -2,6 +2,7 @@ import { PaymentMethod, PaymentStatus } from '../../../generated/prisma/enums';
 import { prisma } from '../../config/database';
 import { createStripePaymentIntent, getStripePaymentIntent } from '../../config/stripe.config';
 import { CreatePaymentData, ConfirmPaymentData } from './payment.interface';
+import { updateGearStockForOrder } from '../../utils/availability.util';
 
 /**
  * Generate unique transaction ID
@@ -35,9 +36,10 @@ export const createPaymentService = async (data: CreatePaymentData, userId: stri
     throw new Error('You do not have permission to create payment for this order');
   }
 
-  // Check if order is in correct status
-  if (order.status !== 'CONFIRMED') {
-    throw new Error('Payment can only be created for confirmed orders');
+  // Check if order is in correct status for payment
+  // Allow payment for PLACED orders to enable better UX (customer pays immediately)
+  if (order.status !== 'PLACED' && order.status !== 'CONFIRMED') {
+    throw new Error('Payment can only be created for placed or confirmed orders');
   }
 
   // Check if payment already exists
@@ -57,10 +59,42 @@ export const createPaymentService = async (data: CreatePaymentData, userId: stri
   const transactionId = generateTransactionId();
   const totalAmount = Number(order.totalAmount);
 
+  // Set payment expiration (30 minutes from now)
+  const expiresAt = new Date();
+  expiresAt.setMinutes(expiresAt.getMinutes() + 30);
+
+  // Wrap PLACED -> CONFIRMED transition, stock adjustment, and payment creation in a database transaction
+  const payment = await prisma.$transaction(async (tx) => {
+    // Auto-transition PLACED orders to CONFIRMED when payment is initiated
+    if (order.status === 'PLACED') {
+      await tx.rentalOrder.update({
+        where: { id: orderId },
+        data: { status: 'CONFIRMED' },
+      });
+
+      // Call stock adjustment (decrements stock since PLACED -> CONFIRMED)
+      await updateGearStockForOrder(orderId, 'CONFIRMED', 'PLACED', tx);
+    }
+
+    // Create payment record
+    return tx.payment.create({
+      data: {
+        transactionId,
+        orderId,
+        userId,
+        amount: order.totalAmount,
+        method,
+        status: PaymentStatus.PENDING,
+        providerResponse: {}, // Temporarily empty
+        expiresAt,
+      },
+    });
+  });
+
   let providerResponse: any = null;
   let paymentUrl: string | null = null;
 
-  // Create Stripe payment intent
+  // Create Stripe payment intent - include the database payment ID in Stripe metadata
   const stripeIntent = await createStripePaymentIntent(
     totalAmount,
     currency.toLowerCase(),
@@ -69,6 +103,7 @@ export const createPaymentService = async (data: CreatePaymentData, userId: stri
       orderNumber: order.orderNumber,
       customerId: order.customerId,
       customerEmail: order.customer.email,
+      paymentId: payment.id, // Linked payment ID
     }
   );
 
@@ -82,21 +117,16 @@ export const createPaymentService = async (data: CreatePaymentData, userId: stri
 
   paymentUrl = null; // Stripe uses client secret on frontend
 
-  // Create payment record
-  const payment = await prisma.payment.create({
+  // Update the payment record with Stripe response details
+  const updatedPayment = await prisma.payment.update({
+    where: { id: payment.id },
     data: {
-      transactionId,
-      orderId,
-      userId,
-      amount: order.totalAmount,
-      method,
-      status: PaymentStatus.PENDING,
       providerResponse,
     },
   });
 
   return {
-    payment,
+    payment: updatedPayment,
     paymentUrl,
     providerResponse,
   };
@@ -149,23 +179,27 @@ export const confirmPaymentService = async (data: ConfirmPaymentData) => {
     currency: stripeIntent.currency,
   };
 
-  // Update payment record
-  const updatedPayment = await prisma.payment.update({
-    where: { id: paymentId },
-    data: {
-      status: paymentStatus,
-      providerResponse: verifiedProviderResponse || providerResponse,
-      ...(paymentStatus === PaymentStatus.COMPLETED && { paidAt: new Date() }),
-    },
-  });
-
-  // Update order status if payment completed
-  if (paymentStatus === PaymentStatus.COMPLETED && payment.order.status === 'CONFIRMED') {
-    await prisma.rentalOrder.update({
-      where: { id: payment.orderId },
-      data: { status: 'PAID' },
+  // Update database in a transaction
+  const updatedPayment = await prisma.$transaction(async (tx) => {
+    const updated = await tx.payment.update({
+      where: { id: paymentId },
+      data: {
+        status: paymentStatus,
+        providerResponse: verifiedProviderResponse || providerResponse,
+        ...(paymentStatus === PaymentStatus.COMPLETED && { paidAt: new Date() }),
+      },
     });
-  }
+
+    // Update order status if payment completed
+    if (paymentStatus === PaymentStatus.COMPLETED && payment.order.status === 'CONFIRMED') {
+      await tx.rentalOrder.update({
+        where: { id: payment.orderId },
+        data: { status: 'PAID' },
+      });
+    }
+
+    return updated;
+  });
 
   return updatedPayment;
 };
@@ -221,6 +255,178 @@ export const getUserPaymentsService = async (userId: string, filters: any) => {
 };
 
 /**
+ * Handle Stripe webhook events
+ */
+export const handleStripeWebhookService = async (event: any) => {
+  const eventType = event.type;
+  const paymentIntent = event.data.object;
+
+  let paymentId: string | null = null;
+  let orderStatus: string | null = null;
+
+  // Extract payment ID from metadata
+  if (paymentIntent.metadata && paymentIntent.metadata.paymentId) {
+    paymentId = paymentIntent.metadata.paymentId;
+  }
+
+  switch (eventType) {
+    case 'payment_intent.succeeded':
+      // Find payment by metadata ID or fallback to intent ID
+      let payment = null;
+      if (paymentId) {
+        payment = await prisma.payment.findUnique({
+          where: { id: paymentId },
+          include: { order: true },
+        });
+      }
+
+      if (!payment) {
+        payment = await prisma.payment.findFirst({
+          where: {
+            providerResponse: {
+              path: ['intentId'],
+              equals: paymentIntent.id,
+            },
+          },
+          include: {
+            order: true,
+          },
+        });
+      }
+
+      if (!payment) {
+        throw new Error('Payment not found for webhook');
+      }
+
+      if (payment.status !== PaymentStatus.COMPLETED) {
+        // Update payment and order status in a transaction
+        await prisma.$transaction(async (tx) => {
+          await tx.payment.update({
+            where: { id: payment.id },
+            data: {
+              status: PaymentStatus.COMPLETED,
+              paidAt: new Date(),
+              providerResponse: {
+                intentId: paymentIntent.id,
+                status: paymentIntent.status,
+                amount: paymentIntent.amount,
+                currency: paymentIntent.currency,
+              },
+            },
+          });
+
+          // Update order status if needed
+          if (payment.order.status === 'CONFIRMED') {
+            await tx.rentalOrder.update({
+              where: { id: payment.orderId },
+              data: { status: 'PAID' },
+            });
+          }
+        });
+      }
+
+      return {
+        success: true,
+        message: 'Payment succeeded',
+        paymentId: payment.id,
+      };
+
+    case 'payment_intent.payment_failed':
+      // Find payment by metadata ID or fallback to intent ID
+      let failedPayment = null;
+      if (paymentId) {
+        failedPayment = await prisma.payment.findUnique({
+          where: { id: paymentId },
+        });
+      }
+
+      if (!failedPayment) {
+        failedPayment = await prisma.payment.findFirst({
+          where: {
+            providerResponse: {
+              path: ['intentId'],
+              equals: paymentIntent.id,
+            },
+          },
+        });
+      }
+
+      if (!failedPayment) {
+        throw new Error('Payment not found for webhook');
+      }
+
+      // Update payment to failed
+      await prisma.payment.update({
+        where: { id: failedPayment.id },
+        data: {
+          status: PaymentStatus.FAILED,
+          providerResponse: {
+            intentId: paymentIntent.id,
+            status: paymentIntent.status,
+            last_payment_error: paymentIntent.last_payment_error,
+          },
+        },
+      });
+
+      return {
+        success: false,
+        message: 'Payment failed',
+        paymentId: failedPayment.id,
+      };
+
+    case 'payment_intent.canceled':
+      // Find payment by metadata ID or fallback to intent ID
+      let canceledPayment = null;
+      if (paymentId) {
+        canceledPayment = await prisma.payment.findUnique({
+          where: { id: paymentId },
+        });
+      }
+
+      if (!canceledPayment) {
+        canceledPayment = await prisma.payment.findFirst({
+          where: {
+            providerResponse: {
+              path: ['intentId'],
+              equals: paymentIntent.id,
+            },
+          },
+        });
+      }
+
+      if (!canceledPayment) {
+        throw new Error('Payment not found for webhook');
+      }
+
+      // Update payment to failed
+      await prisma.payment.update({
+        where: { id: canceledPayment.id },
+        data: {
+          status: PaymentStatus.FAILED,
+          providerResponse: {
+            intentId: paymentIntent.id,
+            status: paymentIntent.status,
+            cancel_reason: paymentIntent.cancellation_reason,
+          },
+        },
+      });
+
+      return {
+        success: false,
+        message: 'Payment canceled',
+        paymentId: canceledPayment.id,
+      };
+
+    default:
+      return {
+        success: true,
+        message: 'Event received but not processed',
+        eventType,
+      };
+  }
+};
+
+/**
  * Get payment by ID
  */
 export const getPaymentByIdService = async (paymentId: string, userId: string, userRole: string) => {
@@ -263,4 +469,83 @@ export const getPaymentByIdService = async (paymentId: string, userId: string, u
   }
 
   return payment;
+};
+
+/**
+ * Clean up expired payments
+ * This should be run periodically (e.g., every hour) to clean up expired pending payments
+ */
+export const cleanupExpiredPaymentsService = async () => {
+  const now = new Date();
+
+  // Find expired pending payments
+  const expiredPayments = await prisma.payment.findMany({
+    where: {
+      status: PaymentStatus.PENDING,
+      expiresAt: {
+        lt: now,
+      },
+    },
+    include: {
+      order: true,
+    },
+  });
+
+  if (expiredPayments.length === 0) {
+    return {
+      cleaned: 0,
+      message: 'No expired payments found',
+    };
+  }
+
+  // Update expired payments to failed
+  const updatePromises = expiredPayments.map((payment) =>
+    prisma.payment.update({
+      where: { id: payment.id },
+      data: {
+        status: PaymentStatus.FAILED,
+        providerResponse: {
+          ...(payment.providerResponse as any || {}),
+          expirationReason: 'Payment expired',
+        },
+      },
+    })
+  );
+
+  await Promise.all(updatePromises);
+
+  // Cancel orders that were CONFIRMED but payment expired
+  const ordersToCancel = expiredPayments
+    .filter((p) => p.order.status === 'CONFIRMED')
+    .map((p) => p.orderId);
+
+  if (ordersToCancel.length > 0) {
+    for (const orderId of ordersToCancel) {
+      try {
+        await prisma.$transaction(async (tx) => {
+          const ord = await tx.rentalOrder.findUnique({
+            where: { id: orderId },
+          });
+          if (ord && ord.status === 'CONFIRMED') {
+            await tx.rentalOrder.update({
+              where: { id: orderId },
+              data: {
+                status: 'CANCELLED',
+              },
+            });
+            // Restore stock correctly using transaction client
+            await updateGearStockForOrder(orderId, 'CANCELLED', 'CONFIRMED', tx);
+          }
+        });
+      } catch (err) {
+        console.error(`Failed to cancel and restore stock for order ${orderId}:`, err);
+      }
+    }
+  }
+
+  return {
+    cleaned: expiredPayments.length,
+    ordersCancelled: ordersToCancel.length,
+    message: `Cleaned up ${expiredPayments.length} expired payments and cancelled ${ordersToCancel.length} orders`,
+  };
 };

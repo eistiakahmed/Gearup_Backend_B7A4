@@ -1,8 +1,8 @@
 import { Request, Response } from 'express';
 import { PaymentMethod } from '../../../generated/prisma/enums';
 import { RequestWithUser } from '../../middlewares/auth.middleware';
-import * as paymentService from './payment.service';
 import { sendError, sendPaginatedResponse, sendSuccess } from '../../utils/apiResponse.util';
+import * as paymentService from './payment.service';
 
 /**
  * @swagger
@@ -503,6 +503,144 @@ export const getPaymentById = async (req: RequestWithUser, res: Response): Promi
       sendError(res, 500, 'Failed to retrieve payment', error.message);
     } else {
       sendError(res, 500, 'Failed to retrieve payment', 'An unexpected error occurred');
+    }
+  }
+};
+
+/**
+ * @swagger
+ * /api/payments/webhook/stripe:
+ *   post:
+ *     summary: Stripe webhook endpoint
+ *     description: Handle webhook events from Stripe for payment confirmation. This endpoint should be configured in your Stripe dashboard.
+ *     tags:
+ *       - Payments
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             description: Stripe webhook event payload
+ *     responses:
+ *       200:
+ *         description: Webhook processed successfully
+ *       400:
+ *         description: Invalid webhook payload
+ *       500:
+ *         description: Server error processing webhook
+ */
+export const handleStripeWebhook = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const sig = req.headers['stripe-signature'] as string;
+    const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+
+    if (!sig || !webhookSecret) {
+      sendError(res, 400, 'Missing signature or webhook secret');
+      return;
+    }
+
+    // Import Stripe here to avoid circular dependencies
+    const { getStripeClient } = await import('../../config/stripe.config');
+    const stripe = getStripeClient();
+
+    // Verify webhook signature using the captured rawBody buffer
+    const rawBody = (req as any).rawBody;
+    if (!rawBody) {
+      console.error('Raw body not captured. Check body parser middleware verify option.');
+      sendError(res, 400, 'Raw body not captured');
+      return;
+    }
+
+    let event;
+    try {
+      event = await stripe.webhooks.constructEventAsync(
+        rawBody,
+        sig,
+        webhookSecret
+      );
+    } catch (err) {
+      console.error('Webhook signature verification failed:', err);
+      sendError(res, 400, 'Invalid signature');
+      return;
+    }
+
+    const result = await paymentService.handleStripeWebhookService(event);
+
+    const { success, ...resultWithoutSuccess } = result as any;
+
+    // Return 200 to acknowledge receipt of webhook
+    res.status(200).json({
+      success: success !== false,
+      ...resultWithoutSuccess,
+    });
+  } catch (error) {
+    console.error('Stripe webhook error:', error);
+    // Still return 200 to prevent Stripe from retrying endlessly on error
+    res.status(200).json({
+      success: false,
+      message: 'Webhook processing failed',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+};
+
+/**
+ * @swagger
+ * /api/payments/cleanup/expired:
+ *   post:
+ *     summary: Clean up expired payments
+ *     description: Mark pending payments as failed if they have expired and cancel associated orders. This should be called periodically (e.g., by a cron job).
+ *     tags:
+ *       - Payments
+ *     security:
+ *       - cookieAuth: []
+ *     responses:
+ *       200:
+ *         description: Expired payments cleaned up successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 cleaned:
+ *                   type: integer
+ *                   description: Number of expired payments cleaned up
+ *                 ordersCancelled:
+ *                   type: integer
+ *                   description: Number of orders cancelled due to expired payments
+ *                 message:
+ *                   type: string
+ *       401:
+ *         description: Authentication required
+ *       403:
+ *         description: Admin access required
+ *       500:
+ *         description: Server error
+ */
+export const cleanupExpiredPayments = async (req: RequestWithUser, res: Response): Promise<void> => {
+  try {
+    if (!req.user) {
+      sendError(res, 401, 'Authentication required', 'User not authenticated');
+      return;
+    }
+
+    if (req.user.role !== 'ADMIN') {
+      sendError(res, 403, 'Access denied', 'Admin access required');
+      return;
+    }
+
+    const result = await paymentService.cleanupExpiredPaymentsService();
+
+    sendSuccess(res, 200, 'Expired payments cleaned up successfully', result);
+  } catch (error) {
+    console.error('Cleanup expired payments error:', error);
+    if (error instanceof Error) {
+      sendError(res, 500, 'Failed to cleanup expired payments', error.message);
+    } else {
+      sendError(res, 500, 'Failed to cleanup expired payments', 'An unexpected error occurred');
     }
   }
 };

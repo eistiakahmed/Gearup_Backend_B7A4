@@ -1,4 +1,4 @@
-import { body, ValidationChain } from 'express-validator';
+import { body, query, ValidationChain } from 'express-validator';
 
 /**
  * Validation rules for creating gear item
@@ -204,56 +204,56 @@ export const createCategoryValidation: ValidationChain[] = [
  * Validation rules for gear query parameters
  */
 export const gearQueryValidation: ValidationChain[] = [
-  body('category')
+  query('category')
     .optional()
     .trim()
     .isUUID()
     .withMessage('Invalid category ID'),
 
-  body('minPrice')
+  query('minPrice')
     .optional()
     .isFloat({ min: 0 })
     .withMessage('Minimum price must be a positive number'),
 
-  body('maxPrice')
+  query('maxPrice')
     .optional()
     .isFloat({ min: 0 })
     .withMessage('Maximum price must be a positive number'),
 
-  body('brand')
+  query('brand')
     .optional()
     .trim()
     .isLength({ max: 100 })
     .withMessage('Brand filter must not exceed 100 characters'),
 
-  body('search')
+  query('search')
     .optional()
     .trim()
     .isLength({ min: 2, max: 100 })
     .withMessage('Search term must be between 2 and 100 characters'),
 
-  body('isAvailable')
+  query('isAvailable')
     .optional()
     .isBoolean()
     .withMessage('Availability filter must be a boolean'),
 
-  body('page')
+  query('page')
     .optional()
     .isInt({ min: 1 })
     .withMessage('Page number must be at least 1'),
 
-  body('limit')
+  query('limit')
     .optional()
     .isInt({ min: 1, max: 100 })
     .withMessage('Limit must be between 1 and 100'),
 
-  body('sortBy')
+  query('sortBy')
     .optional()
     .trim()
     .isIn(['price', 'name', 'createdAt', 'popularity'])
     .withMessage('Sort by must be one of: price, name, createdAt, popularity'),
 
-  body('sortOrder')
+  query('sortOrder')
     .optional()
     .trim()
     .isIn(['asc', 'desc'])

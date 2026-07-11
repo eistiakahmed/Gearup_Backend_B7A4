@@ -12,7 +12,8 @@
     "start": "node dist/server.js",
     "prisma:generate": "prisma generate",
     "prisma:push": "prisma db push",
-    "prisma:studio": "prisma studio"
+    "prisma:studio": "prisma studio",
+    "stripe": "stripe listen --forward-to localhost:5000/webhook"
   },
   "devDependencies": {
     "@types/node": "^26.1.1",

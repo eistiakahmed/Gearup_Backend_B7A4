@@ -27,6 +27,7 @@ const config = {
   // Stripe Payment
   stripeSecretKey: process.env.STRIPE_SECRET_KEY,
   stripePublishableKey: process.env.STRIPE_PUBLISHABLE_KEY,
+  stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET,
 
   // Application Settings
   defaultCurrency: process.env.DEFAULT_CURRENCY,
@@ -120,6 +121,7 @@ const config = {
       jwtRefreshExpiresIn: this.jwtRefreshExpiresIn,
       stripeSecretKey: this.stripeSecretKey ? '***CONFIGURED***' : 'NOT CONFIGURED',
       stripePublishableKey: this.stripePublishableKey || 'NOT CONFIGURED',
+      stripeWebhookSecret: this.stripeWebhookSecret ? '***CONFIGURED***' : 'NOT CONFIGURED',
       defaultCurrency: this.defaultCurrency,
       maxRentalDays: this.maxRentalDays,
       maxRentalItems: this.maxRentalItems,

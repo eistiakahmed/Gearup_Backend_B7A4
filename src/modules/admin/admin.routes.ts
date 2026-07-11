@@ -48,6 +48,7 @@ router.get('/users/:id', getUserById);
  * @access  Admin
  */
 router.patch('/users/:id/status', updateUserStatusValidation, handleValidationErrors, updateUserStatus);
+router.patch('/users/:id', updateUserStatusValidation, handleValidationErrors, updateUserStatus);
 
 /**
  * @route   GET /api/admin/gear

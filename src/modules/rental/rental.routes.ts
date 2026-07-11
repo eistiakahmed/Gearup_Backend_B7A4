@@ -6,7 +6,7 @@ import {
   updateOrderStatus,
   cancelRentalOrder,
 } from './rental.controller';
-import { createRentalValidation, updateOrderStatusValidation } from './rental.validator';
+import { createRentalValidation, updateOrderStatusValidation, rentalQueryValidation } from './rental.validator';
 import { authenticate } from '../../middlewares/auth.middleware';
 import { customerOnly, providerOrAdmin } from '../../middlewares/role.middleware';
 import { handleValidationErrors } from '../../middlewares/validation.middleware';
@@ -28,7 +28,7 @@ router.post('/', customerOnly, createRentalValidation, handleValidationErrors, c
  * @desc    Get user's rental orders
  * @access  Customer
  */
-router.get('/', customerOnly, getUserRentalOrders);
+router.get('/', customerOnly, rentalQueryValidation, handleValidationErrors, getUserRentalOrders);
 
 /**
  * @route   GET /api/rentals/:id
