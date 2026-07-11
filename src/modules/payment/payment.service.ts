@@ -136,7 +136,7 @@ export const createPaymentService = async (data: CreatePaymentData, userId: stri
  * Confirm payment
  */
 export const confirmPaymentService = async (data: ConfirmPaymentData) => {
-  const { paymentId, providerResponse } = data;
+  const { paymentId, providerResponse, mockSuccess } = data;
 
   // Get payment record
   const payment = await prisma.payment.findUnique({
@@ -157,27 +157,38 @@ export const confirmPaymentService = async (data: ConfirmPaymentData) => {
   let paymentStatus: PaymentStatus = PaymentStatus.PENDING;
   let verifiedProviderResponse: any = null;
 
-  // Verify with Stripe
+  // Verify with Stripe or Mock if in dev/test environment
   const storedResponse = payment.providerResponse as any;
   const intentId = providerResponse?.intentId || storedResponse?.intentId;
-  if (!intentId) {
-    throw new Error('Stripe intent ID not found');
-  }
 
-  const stripeIntent = await getStripePaymentIntent(intentId);
-
-  if (stripeIntent.status === 'succeeded') {
+  if (process.env.NODE_ENV !== 'production' && mockSuccess) {
     paymentStatus = PaymentStatus.COMPLETED;
-  } else if (stripeIntent.status === 'requires_payment_method' || stripeIntent.status === 'canceled') {
-    paymentStatus = PaymentStatus.FAILED;
-  }
+    verifiedProviderResponse = {
+      intentId: intentId || 'mock_intent_id',
+      status: 'succeeded',
+      amount: Number(payment.amount) * 100,
+      currency: 'usd',
+    };
+  } else {
+    if (!intentId) {
+      throw new Error('Stripe intent ID not found');
+    }
 
-  verifiedProviderResponse = {
-    intentId: stripeIntent.id,
-    status: stripeIntent.status,
-    amount: stripeIntent.amount,
-    currency: stripeIntent.currency,
-  };
+    const stripeIntent = await getStripePaymentIntent(intentId);
+
+    if (stripeIntent.status === 'succeeded') {
+      paymentStatus = PaymentStatus.COMPLETED;
+    } else if (stripeIntent.status === 'requires_payment_method' || stripeIntent.status === 'canceled') {
+      paymentStatus = PaymentStatus.FAILED;
+    }
+
+    verifiedProviderResponse = {
+      intentId: stripeIntent.id,
+      status: stripeIntent.status,
+      amount: stripeIntent.amount,
+      currency: stripeIntent.currency,
+    };
+  }
 
   // Update database in a transaction
   const updatedPayment = await prisma.$transaction(async (tx) => {

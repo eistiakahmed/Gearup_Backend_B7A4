@@ -97,7 +97,7 @@
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/your-username/gearup-backend.git
+git clone https://github.com/eistiakahmed/Gearup_Backend_B7A4.git
 cd gearup-backend
 
 # 2. Install dependencies
@@ -147,7 +147,7 @@ CORS_ORIGIN=http://localhost:3000
 ##  API Documentation
 
 ### Interactive Documentation
-Once the server is running, visit **`http://localhost:5000/api-docs`** for interactive API documentation with Swagger UI.
+Once the server is running, visit **`https://gearup-backend-feqw.onrender.com/api-docs`** for interactive API documentation with Swagger UI.
 
 ### Core Endpoints
 
@@ -461,7 +461,7 @@ railway up
 
 ### Health Check
 ```bash
-curl http://your-domain.com/health
+curl https://gearup-backend-feqw.onrender.com/health
 ```
 
 ### Database Management

@@ -12,4 +12,5 @@ export interface CreatePaymentData {
 export interface ConfirmPaymentData {
   paymentId: string;
   providerResponse?: any;
+  mockSuccess?: boolean;
 }

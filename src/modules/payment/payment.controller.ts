@@ -221,11 +221,12 @@ export const createPayment = async (req: RequestWithUser, res: Response): Promis
  */
 export const confirmPayment = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { paymentId, providerResponse } = req.body;
+    const { paymentId, providerResponse, mockSuccess } = req.body;
 
     const confirmData = {
       paymentId,
       providerResponse,
+      mockSuccess,
     };
 
     const payment = await paymentService.confirmPaymentService(confirmData);

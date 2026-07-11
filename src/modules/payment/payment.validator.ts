@@ -49,6 +49,11 @@ export const confirmPaymentValidation: ValidationChain[] = [
     .optional()
     .isObject()
     .withMessage('Provider response must be a valid JSON object'),
+
+  body('mockSuccess')
+    .optional()
+    .isBoolean()
+    .withMessage('mockSuccess must be a boolean'),
 ];
 
 /**
