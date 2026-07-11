@@ -9,7 +9,7 @@
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "build": "tsc",
-    "start": "node dist/src/server.js",
+    "start": "tsx src/server.ts",
     "prisma:generate": "prisma generate",
     "prisma:push": "prisma db push",
     "prisma:studio": "prisma studio",
@@ -20,7 +20,6 @@
     "@types/pg": "^8.20.0",
     "dotenv": "^17.4.2",
     "prisma": "^7.8.0",
-    "tsx": "^4.23.0",
     "typescript": "^7.0.2"
   },
   "dependencies": {
@@ -42,6 +41,7 @@
     "pg": "^8.22.0",
     "stripe": "^22.3.0",
     "swagger-jsdoc": "^6.3.0",
-    "swagger-ui-express": "^5.0.1"
+    "swagger-ui-express": "^5.0.1",
+    "tsx": "^4.23.0"
   }
 }
