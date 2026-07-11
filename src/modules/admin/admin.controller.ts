@@ -758,3 +758,359 @@ export const getDashboardStats = async (req: RequestWithUser, res: Response): Pr
     }
   }
 };
+
+/**
+ * @swagger
+ * /api/admin/categories:
+ *   get:
+ *     summary: Get all categories
+ *     description: Retrieve a list of all categories with gear item counts. Only accessible by admin users.
+ *     tags:
+ *       - Admin
+ *     security:
+ *       - cookieAuth: []
+ *     responses:
+ *       200:
+ *         description: Categories retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/Success'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       type: array
+ *                       items:
+ *                         $ref: '#/components/schemas/Category'
+ *       401:
+ *         description: Authentication required
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       403:
+ *         description: Admin access required
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       500:
+ *         description: Server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
+export const getAllCategories = async (req: RequestWithUser, res: Response): Promise<void> => {
+  try {
+    if (!req.user || req.user.role !== 'ADMIN') {
+      sendError(res, 403, 'Access denied', 'Admin access required');
+      return;
+    }
+
+    const categories = await adminService.getAllCategoriesService();
+
+    sendSuccess(res, 200, 'Categories retrieved successfully', categories);
+  } catch (error) {
+    console.error('Get all categories error:', error);
+    if (error instanceof Error) {
+      sendError(res, 500, 'Failed to retrieve categories', error.message);
+    } else {
+      sendError(res, 500, 'Failed to retrieve categories', 'An unexpected error occurred');
+    }
+  }
+};
+
+/**
+ * @swagger
+ * /api/admin/categories:
+ *   post:
+ *     summary: Create new category
+ *     description: Create a new gear category. Only accessible by admin users.
+ *     tags:
+ *       - Admin
+ *     security:
+ *       - cookieAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - name
+ *             properties:
+ *               name:
+ *                 type: string
+ *                 description: Category name
+ *                 example: "Camping Equipment"
+ *               description:
+ *                 type: string
+ *                 description: Category description
+ *                 example: "Tents, sleeping bags, and camping accessories"
+ *     responses:
+ *       201:
+ *         description: Category created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/Success'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       $ref: '#/components/schemas/Category'
+ *       400:
+ *         description: Category already exists
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       401:
+ *         description: Authentication required
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       403:
+ *         description: Admin access required
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       500:
+ *         description: Server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
+export const createCategory = async (req: RequestWithUser, res: Response): Promise<void> => {
+  try {
+    if (!req.user || req.user.role !== 'ADMIN') {
+      sendError(res, 403, 'Access denied', 'Admin access required');
+      return;
+    }
+
+    const { name, description } = req.body;
+    const category = await adminService.createCategoryService(name, description);
+
+    sendSuccess(res, 201, 'Category created successfully', category);
+  } catch (error) {
+    console.error('Create category error:', error);
+    if (error instanceof Error) {
+      if (error.message.includes('already exists')) {
+        sendError(res, 400, error.message);
+        return;
+      }
+      sendError(res, 500, 'Failed to create category', error.message);
+    } else {
+      sendError(res, 500, 'Failed to create category', 'An unexpected error occurred');
+    }
+  }
+};
+
+/**
+ * @swagger
+ * /api/admin/categories/{id}:
+ *   put:
+ *     summary: Update category
+ *     description: Update an existing category. Only accessible by admin users.
+ *     tags:
+ *       - Admin
+ *     security:
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: Category ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name:
+ *                 type: string
+ *                 description: Updated category name
+ *                 example: "Camping & Outdoor Equipment"
+ *               description:
+ *                 type: string
+ *                 description: Updated category description
+ *                 example: "Tents, sleeping bags, camping accessories, and outdoor gear"
+ *     responses:
+ *       200:
+ *         description: Category updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/Success'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       $ref: '#/components/schemas/Category'
+ *       400:
+ *         description: Category name conflict
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       401:
+ *         description: Authentication required
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       403:
+ *         description: Admin access required
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       404:
+ *         description: Category not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       500:
+ *         description: Server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
+export const updateCategory = async (req: RequestWithUser, res: Response): Promise<void> => {
+  try {
+    if (!req.user || req.user.role !== 'ADMIN') {
+      sendError(res, 403, 'Access denied', 'Admin access required');
+      return;
+    }
+
+    const id = req.params['id'] as string;
+    if (!id) { sendError(res, 400, 'Category ID is required'); return; }
+
+    const { name, description } = req.body;
+    const category = await adminService.updateCategoryService(id, name, description);
+
+    sendSuccess(res, 200, 'Category updated successfully', category);
+  } catch (error) {
+    console.error('Update category error:', error);
+    if (error instanceof Error) {
+      if (error.message.includes('not found')) {
+        sendError(res, 404, error.message);
+        return;
+      }
+      if (error.message.includes('already exists')) {
+        sendError(res, 400, error.message);
+        return;
+      }
+      sendError(res, 500, 'Failed to update category', error.message);
+    } else {
+      sendError(res, 500, 'Failed to update category', 'An unexpected error occurred');
+    }
+  }
+};
+
+/**
+ * @swagger
+ * /api/admin/categories/{id}:
+ *   delete:
+ *     summary: Delete category
+ *     description: Delete a category. Only accessible by admin users. Cannot delete categories with existing gear items.
+ *     tags:
+ *       - Admin
+ *     security:
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: Category ID
+ *     responses:
+ *       200:
+ *         description: Category deleted successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/Success'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       type: object
+ *                       properties:
+ *                         message:
+ *                           type: string
+ *                           example: "Category deleted successfully"
+ *       400:
+ *         description: Cannot delete category with gear items
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       401:
+ *         description: Authentication required
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       403:
+ *         description: Admin access required
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       404:
+ *         description: Category not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       500:
+ *         description: Server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
+export const deleteCategory = async (req: RequestWithUser, res: Response): Promise<void> => {
+  try {
+    if (!req.user || req.user.role !== 'ADMIN') {
+      sendError(res, 403, 'Access denied', 'Admin access required');
+      return;
+    }
+
+    const id = req.params['id'] as string;
+    if (!id) { sendError(res, 400, 'Category ID is required'); return; }
+
+    const result = await adminService.deleteCategoryService(id);
+
+    sendSuccess(res, 200, result.message, result);
+  } catch (error) {
+    console.error('Delete category error:', error);
+    if (error instanceof Error) {
+      if (error.message.includes('not found')) {
+        sendError(res, 404, error.message);
+        return;
+      }
+      if (error.message.includes('Cannot delete')) {
+        sendError(res, 400, error.message);
+        return;
+      }
+      sendError(res, 500, 'Failed to delete category', error.message);
+    } else {
+      sendError(res, 500, 'Failed to delete category', 'An unexpected error occurred');
+    }
+  }
+};

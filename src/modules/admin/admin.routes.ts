@@ -6,8 +6,12 @@ import {
   getAllGear,
   getAllRentalOrders,
   getDashboardStats,
+  getAllCategories,
+  createCategory,
+  updateCategory,
+  deleteCategory,
 } from './admin.controller';
-import { updateUserStatusValidation } from './admin.validator';
+import { updateUserStatusValidation, createCategoryValidation, updateCategoryValidation } from './admin.validator';
 import { authenticate } from '../../middlewares/auth.middleware';
 import { adminOnly } from '../../middlewares/role.middleware';
 import { handleValidationErrors } from '../../middlewares/validation.middleware';
@@ -58,5 +62,33 @@ router.get('/gear', getAllGear);
  * @access  Admin
  */
 router.get('/rentals', getAllRentalOrders);
+
+/**
+ * @route   GET /api/admin/categories
+ * @desc    Get all categories
+ * @access  Admin
+ */
+router.get('/categories', getAllCategories);
+
+/**
+ * @route   POST /api/admin/categories
+ * @desc    Create new category
+ * @access  Admin
+ */
+router.post('/categories', createCategoryValidation, handleValidationErrors, createCategory);
+
+/**
+ * @route   PUT /api/admin/categories/:id
+ * @desc    Update category
+ * @access  Admin
+ */
+router.put('/categories/:id', updateCategoryValidation, handleValidationErrors, updateCategory);
+
+/**
+ * @route   DELETE /api/admin/categories/:id
+ * @desc    Delete category
+ * @access  Admin
+ */
+router.delete('/categories/:id', deleteCategory);
 
 export default router;

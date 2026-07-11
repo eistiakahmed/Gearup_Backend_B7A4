@@ -16,6 +16,43 @@ export const updateUserStatusValidation: ValidationChain[] = [
 ];
 
 /**
+ * Validation rules for creating a category
+ */
+export const createCategoryValidation: ValidationChain[] = [
+  body('name')
+    .trim()
+    .isLength({ min: 2, max: 50 })
+    .withMessage('Category name must be between 2 and 50 characters')
+    .matches(/^[a-zA-Z0-9\s&-]+$/)
+    .withMessage('Category name can only contain letters, numbers, spaces, ampersands, and hyphens'),
+
+  body('description')
+    .optional()
+    .trim()
+    .isLength({ max: 500 })
+    .withMessage('Description must not exceed 500 characters'),
+];
+
+/**
+ * Validation rules for updating a category
+ */
+export const updateCategoryValidation: ValidationChain[] = [
+  body('name')
+    .optional()
+    .trim()
+    .isLength({ min: 2, max: 50 })
+    .withMessage('Category name must be between 2 and 50 characters')
+    .matches(/^[a-zA-Z0-9\s&-]+$/)
+    .withMessage('Category name can only contain letters, numbers, spaces, ampersands, and hyphens'),
+
+  body('description')
+    .optional()
+    .trim()
+    .isLength({ max: 500 })
+    .withMessage('Description must not exceed 500 characters'),
+];
+
+/**
  * Validation rules for admin query parameters
  */
 export const adminQueryValidation: ValidationChain[] = [

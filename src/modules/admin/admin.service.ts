@@ -395,3 +395,113 @@ export const getDashboardStatsService = async () => {
     },
   };
 };
+
+/**
+ * Get all categories (Admin only)
+ */
+export const getAllCategoriesService = async () => {
+  const categories = await prisma.category.findMany({
+    include: {
+      _count: {
+        select: {
+          gearItems: true,
+        },
+      },
+    },
+    orderBy: {
+      name: 'asc',
+    },
+  });
+
+  return categories;
+};
+
+/**
+ * Create new category (Admin only)
+ */
+export const createCategoryService = async (name: string, description?: string) => {
+  // Check if category already exists
+  const existingCategory = await prisma.category.findUnique({
+    where: { name },
+  });
+
+  if (existingCategory) {
+    throw new Error('Category with this name already exists');
+  }
+
+  const category = await prisma.category.create({
+    data: {
+      name,
+      description,
+    },
+  });
+
+  return category;
+};
+
+/**
+ * Update category (Admin only)
+ */
+export const updateCategoryService = async (categoryId: string, name?: string, description?: string) => {
+  // Check if category exists
+  const existingCategory = await prisma.category.findUnique({
+    where: { id: categoryId },
+  });
+
+  if (!existingCategory) {
+    throw new Error('Category not found');
+  }
+
+  // Check if new name conflicts with existing category
+  if (name && name !== existingCategory.name) {
+    const nameConflict = await prisma.category.findUnique({
+      where: { name },
+    });
+
+    if (nameConflict) {
+      throw new Error('Category with this name already exists');
+    }
+  }
+
+  const updatedCategory = await prisma.category.update({
+    where: { id: categoryId },
+    data: {
+      ...(name && { name }),
+      ...(description !== undefined && { description }),
+    },
+  });
+
+  return updatedCategory;
+};
+
+/**
+ * Delete category (Admin only)
+ */
+export const deleteCategoryService = async (categoryId: string) => {
+  // Check if category exists
+  const existingCategory = await prisma.category.findUnique({
+    where: { id: categoryId },
+    include: {
+      _count: {
+        select: {
+          gearItems: true,
+        },
+      },
+    },
+  });
+
+  if (!existingCategory) {
+    throw new Error('Category not found');
+  }
+
+  // Check if category has gear items
+  if (existingCategory._count.gearItems > 0) {
+    throw new Error('Cannot delete category with existing gear items. Please reassign or delete the gear items first.');
+  }
+
+  await prisma.category.delete({
+    where: { id: categoryId },
+  });
+
+  return { message: 'Category deleted successfully' };
+};
