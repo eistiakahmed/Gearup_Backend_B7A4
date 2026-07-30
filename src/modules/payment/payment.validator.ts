@@ -22,17 +22,17 @@ export const createPaymentValidation: ValidationChain[] = [
 
   body('successUrl')
     .optional()
-    .isURL()
+    .isURL({ require_tld: false })
     .withMessage('Success URL must be a valid URL'),
 
   body('cancelUrl')
     .optional()
-    .isURL()
+    .isURL({ require_tld: false })
     .withMessage('Cancel URL must be a valid URL'),
 
   body('failUrl')
     .optional()
-    .isURL()
+    .isURL({ require_tld: false })
     .withMessage('Fail URL must be a valid URL'),
 ];
 
