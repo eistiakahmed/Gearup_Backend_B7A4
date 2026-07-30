@@ -1,6 +1,6 @@
 import { PaymentMethod, PaymentStatus } from '../../../generated/prisma/enums';
 import { prisma } from '../../config/database';
-import { createStripePaymentIntent, getStripePaymentIntent } from '../../config/stripe.config';
+import { createStripeCheckoutSession, createStripePaymentIntent, getStripePaymentIntent } from '../../config/stripe.config';
 import { CreatePaymentData, ConfirmPaymentData } from './payment.interface';
 import { updateGearStockForOrder } from '../../utils/availability.util';
 
@@ -94,30 +94,36 @@ export const createPaymentService = async (data: CreatePaymentData, userId: stri
   let providerResponse: any = null;
   let paymentUrl: string | null = null;
 
-  // Create Stripe payment intent - include the database payment ID in Stripe metadata
-  const stripeIntent = await createStripePaymentIntent(
+  // Create Stripe Checkout Session
+  const session = await createStripeCheckoutSession(
     totalAmount,
     currency.toLowerCase(),
     {
-      orderId: order.id,
       orderNumber: order.orderNumber,
-      customerId: order.customerId,
-      customerEmail: order.customer.email,
-      paymentId: payment.id, // Linked payment ID
+      successUrl,
+      cancelUrl,
+      metadata: {
+        orderId: order.id,
+        orderNumber: order.orderNumber,
+        customerId: order.customerId,
+        customerEmail: order.customer.email,
+        paymentId: payment.id,
+      },
     }
   );
 
   providerResponse = {
-    intentId: stripeIntent.id,
-    clientSecret: stripeIntent.client_secret,
-    amount: stripeIntent.amount,
-    currency: stripeIntent.currency,
-    status: stripeIntent.status,
+    sessionId: session.id,
+    sessionUrl: session.url,
+    intentId: typeof session.payment_intent === 'string' ? session.payment_intent : null,
+    amount: session.amount_total,
+    currency: session.currency,
+    status: session.payment_status,
   };
 
-  paymentUrl = null; // Stripe uses client secret on frontend
+  paymentUrl = session.url;
 
-  // Update the payment record with Stripe response details
+  // Update the payment record with Stripe Checkout Session details
   const updatedPayment = await prisma.payment.update({
     where: { id: payment.id },
     data: {
@@ -127,6 +133,7 @@ export const createPaymentService = async (data: CreatePaymentData, userId: stri
 
   return {
     payment: updatedPayment,
+    sessionId: session.id,
     paymentUrl,
     providerResponse,
   };
@@ -270,19 +277,18 @@ export const getUserPaymentsService = async (userId: string, filters: any) => {
  */
 export const handleStripeWebhookService = async (event: any) => {
   const eventType = event.type;
-  const paymentIntent = event.data.object;
+  const stripeObject = event.data.object;
 
   let paymentId: string | null = null;
-  let orderStatus: string | null = null;
 
   // Extract payment ID from metadata
-  if (paymentIntent.metadata && paymentIntent.metadata.paymentId) {
-    paymentId = paymentIntent.metadata.paymentId;
+  if (stripeObject.metadata && stripeObject.metadata.paymentId) {
+    paymentId = stripeObject.metadata.paymentId;
   }
 
   switch (eventType) {
+    case 'checkout.session.completed':
     case 'payment_intent.succeeded':
-      // Find payment by metadata ID or fallback to intent ID
       let payment = null;
       if (paymentId) {
         payment = await prisma.payment.findUnique({
@@ -294,10 +300,20 @@ export const handleStripeWebhookService = async (event: any) => {
       if (!payment) {
         payment = await prisma.payment.findFirst({
           where: {
-            providerResponse: {
-              path: ['intentId'],
-              equals: paymentIntent.id,
-            },
+            OR: [
+              {
+                providerResponse: {
+                  path: ['sessionId'],
+                  equals: stripeObject.id,
+                },
+              },
+              {
+                providerResponse: {
+                  path: ['intentId'],
+                  equals: stripeObject.id,
+                },
+              },
+            ],
           },
           include: {
             order: true,
@@ -318,10 +334,11 @@ export const handleStripeWebhookService = async (event: any) => {
               status: PaymentStatus.COMPLETED,
               paidAt: new Date(),
               providerResponse: {
-                intentId: paymentIntent.id,
-                status: paymentIntent.status,
-                amount: paymentIntent.amount,
-                currency: paymentIntent.currency,
+                ...(payment.providerResponse as object || {}),
+                eventId: event.id,
+                status: stripeObject.payment_status || stripeObject.status,
+                amount: stripeObject.amount_total || stripeObject.amount,
+                currency: stripeObject.currency,
               },
             },
           });
@@ -356,7 +373,7 @@ export const handleStripeWebhookService = async (event: any) => {
           where: {
             providerResponse: {
               path: ['intentId'],
-              equals: paymentIntent.id,
+              equals: stripeObject.id,
             },
           },
         });
@@ -372,9 +389,9 @@ export const handleStripeWebhookService = async (event: any) => {
         data: {
           status: PaymentStatus.FAILED,
           providerResponse: {
-            intentId: paymentIntent.id,
-            status: paymentIntent.status,
-            last_payment_error: paymentIntent.last_payment_error,
+            intentId: stripeObject.id,
+            status: stripeObject.status,
+            last_payment_error: stripeObject.last_payment_error,
           },
         },
       });
@@ -399,7 +416,7 @@ export const handleStripeWebhookService = async (event: any) => {
           where: {
             providerResponse: {
               path: ['intentId'],
-              equals: paymentIntent.id,
+              equals: stripeObject.id,
             },
           },
         });
@@ -415,9 +432,9 @@ export const handleStripeWebhookService = async (event: any) => {
         data: {
           status: PaymentStatus.FAILED,
           providerResponse: {
-            intentId: paymentIntent.id,
-            status: paymentIntent.status,
-            cancel_reason: paymentIntent.cancellation_reason,
+            intentId: stripeObject.id,
+            status: stripeObject.status,
+            cancel_reason: stripeObject.cancellation_reason,
           },
         },
       });

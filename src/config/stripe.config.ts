@@ -55,3 +55,44 @@ export const getStripePaymentIntent = async (paymentIntentId: string): Promise<S
 
   return paymentIntent;
 };
+
+/**
+ * Create Stripe checkout session
+ */
+export const createStripeCheckoutSession = async (
+  amount: number,
+  currency: string = 'usd',
+  options: {
+    orderNumber: string;
+    successUrl?: string;
+    cancelUrl?: string;
+    metadata?: Record<string, string>;
+  }
+): Promise<Stripe.Checkout.Session> => {
+  const stripe = getStripeClient();
+
+  const successUrl = options.successUrl || `${process.env.CORS_ORIGIN || 'http://localhost:3000'}/payment/success?session_id={CHECKOUT_SESSION_ID}`;
+  const cancelUrl = options.cancelUrl || `${process.env.CORS_ORIGIN || 'http://localhost:3000'}/payment/cancel`;
+
+  const session = await stripe.checkout.sessions.create({
+    payment_method_types: ['card'],
+    line_items: [
+      {
+        price_data: {
+          currency: currency.toLowerCase(),
+          product_data: {
+            name: `GearUp Rental Order #${options.orderNumber}`,
+          },
+          unit_amount: Math.round(amount * 100),
+        },
+        quantity: 1,
+      },
+    ],
+    mode: 'payment',
+    success_url: successUrl,
+    cancel_url: cancelUrl,
+    metadata: options.metadata,
+  });
+
+  return session;
+};

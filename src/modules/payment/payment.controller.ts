@@ -66,6 +66,9 @@ import * as paymentService from './payment.service';
  *                         sessionId:
  *                           type: string
  *                           description: Stripe checkout session ID
+ *                         paymentUrl:
+ *                           type: string
+ *                           description: Stripe checkout session redirect URL
  *                         amount:
  *                           type: number
  *                           format: float
