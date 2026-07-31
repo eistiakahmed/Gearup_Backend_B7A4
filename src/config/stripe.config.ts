@@ -64,6 +64,8 @@ export const createStripeCheckoutSession = async (
   currency: string = 'usd',
   options: {
     orderNumber: string;
+    customerEmail?: string;
+    customerName?: string;
     successUrl?: string;
     cancelUrl?: string;
     metadata?: Record<string, string>;
@@ -74,7 +76,7 @@ export const createStripeCheckoutSession = async (
   const successUrl = options.successUrl || `${process.env.CORS_ORIGIN || 'http://localhost:3000'}/payment/success?session_id={CHECKOUT_SESSION_ID}`;
   const cancelUrl = options.cancelUrl || `${process.env.CORS_ORIGIN || 'http://localhost:3000'}/payment/cancel`;
 
-  const session = await stripe.checkout.sessions.create({
+  const sessionParams: Stripe.Checkout.SessionCreateParams = {
     payment_method_types: ['card'],
     line_items: [
       {
@@ -92,7 +94,11 @@ export const createStripeCheckoutSession = async (
     success_url: successUrl,
     cancel_url: cancelUrl,
     metadata: options.metadata,
-  });
+  };
 
-  return session;
+  if (options.customerEmail) {
+    sessionParams.customer_email = options.customerEmail;
+  }
+
+  return await stripe.checkout.sessions.create(sessionParams);
 };

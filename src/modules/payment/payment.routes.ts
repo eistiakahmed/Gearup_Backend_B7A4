@@ -2,6 +2,7 @@ import { Router } from 'express';
 import {
   createPayment,
   confirmPayment,
+  verifySession,
   getUserPayments,
   getPaymentById,
   handleStripeWebhook,
@@ -21,7 +22,15 @@ router.post('/webhook/stripe', handleStripeWebhook);
 router.use(authenticate);
 
 /**
+ * @route   POST /api/payments/verify-session
+ * @desc    Verify Stripe Checkout Session and update status to PAID
+ * @access  Customer
+ */
+router.post('/verify-session', customerOnly, verifySession);
+
+/**
  * @route   POST /api/payments/create
+
  * @desc    Create payment intent/session
  * @access  Customer
  */

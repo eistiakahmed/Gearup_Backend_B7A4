@@ -335,12 +335,13 @@ export const updateOrderStatusService = async (
   // Cancellation allowed from PLACED and CONFIRMED
   const validTransitions: Record<OrderStatus, OrderStatus[]> = {
     [OrderStatus.PLACED]: ['CONFIRMED', 'CANCELLED'], // Customer can place order, provider confirms, or customer cancels
-    [OrderStatus.CONFIRMED]: ['PAID', 'CANCELLED'],    // Payment completes → PAID, or provider cancels
+    [OrderStatus.CONFIRMED]: ['PAID', 'PICKED_UP', 'CANCELLED'], // Payment completes → PAID, or provider marks picked up/cancels
     [OrderStatus.PAID]: ['PICKED_UP'],                // Provider marks as picked up after payment
     [OrderStatus.PICKED_UP]: ['RETURNED'],           // Provider marks as returned
     [OrderStatus.RETURNED]: [],                      // Terminal state
     [OrderStatus.CANCELLED]: [],                     // Terminal state
   };
+
 
   const allowedStatuses = validTransitions[existingOrder.status] ?? [];
   if (!allowedStatuses.includes(status)) {

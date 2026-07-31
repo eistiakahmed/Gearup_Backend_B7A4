@@ -42,6 +42,8 @@ export const createPaymentService = async (data: CreatePaymentData, userId: stri
     throw new Error('Payment can only be created for placed or confirmed orders');
   }
 
+  const totalAmount = Number(order.totalAmount);
+
   // Check if payment already exists
   const existingPayment = await prisma.payment.findFirst({
     where: {
@@ -53,13 +55,57 @@ export const createPaymentService = async (data: CreatePaymentData, userId: stri
   });
 
   if (existingPayment) {
-    throw new Error('Payment already exists for this order');
+    if (existingPayment.status === 'COMPLETED') {
+      throw new Error('Payment has already been completed for this order');
+    }
+
+    // Generate fresh Stripe Checkout session with customerEmail and customerName
+    const session = await createStripeCheckoutSession(
+      totalAmount,
+      currency.toLowerCase(),
+      {
+        orderNumber: order.orderNumber,
+        customerEmail: (data as any).customerEmail || order.customer?.email,
+        customerName: (data as any).customerName || order.customer?.name,
+        successUrl,
+        cancelUrl,
+
+        metadata: {
+          orderId: order.id,
+          orderNumber: order.orderNumber,
+          customerId: order.customerId,
+          customerEmail: order.customer.email,
+          paymentId: existingPayment.id,
+        },
+      }
+    );
+
+    const providerResponse = {
+      sessionId: session.id,
+      sessionUrl: session.url,
+      intentId: typeof session.payment_intent === 'string' ? session.payment_intent : null,
+      amount: session.amount_total,
+      currency: session.currency,
+      status: session.payment_status,
+    };
+
+    await prisma.payment.update({
+      where: { id: existingPayment.id },
+      data: { providerResponse },
+    });
+
+    return {
+      payment: existingPayment,
+      sessionId: session.id,
+      paymentUrl: session.url,
+      providerResponse,
+    };
   }
 
   const transactionId = generateTransactionId();
-  const totalAmount = Number(order.totalAmount);
 
   // Set payment expiration (30 minutes from now)
+
   const expiresAt = new Date();
   expiresAt.setMinutes(expiresAt.getMinutes() + 30);
 
@@ -100,8 +146,12 @@ export const createPaymentService = async (data: CreatePaymentData, userId: stri
     currency.toLowerCase(),
     {
       orderNumber: order.orderNumber,
+      customerEmail: order.customer?.email,
+      customerName: order.customer?.name,
       successUrl,
+
       cancelUrl,
+
       metadata: {
         orderId: order.id,
         orderNumber: order.orderNumber,
@@ -209,7 +259,7 @@ export const confirmPaymentService = async (data: ConfirmPaymentData) => {
     });
 
     // Update order status if payment completed
-    if (paymentStatus === PaymentStatus.COMPLETED && payment.order.status === 'CONFIRMED') {
+    if (paymentStatus === PaymentStatus.COMPLETED && (payment.order.status === 'CONFIRMED' || payment.order.status === 'PLACED')) {
       await tx.rentalOrder.update({
         where: { id: payment.orderId },
         data: { status: 'PAID' },
@@ -221,6 +271,73 @@ export const confirmPaymentService = async (data: ConfirmPaymentData) => {
 
   return updatedPayment;
 };
+
+/**
+ * Verify Stripe Checkout Session and mark payment & order as PAID
+ */
+export const verifySessionService = async (
+  sessionId: string,
+  orderId?: string
+): Promise<{ paid: boolean; session?: any }> => {
+
+  const { getStripeClient } = await import('../../config/stripe.config');
+  const stripe = getStripeClient();
+  const session = await stripe.checkout.sessions.retrieve(sessionId);
+
+  if (session.payment_status !== 'paid') {
+    return { paid: false, session };
+  }
+
+  // Find payment associated with order or session
+  const targetOrderId = orderId || (session.metadata?.orderId as string);
+
+  let payment = null;
+  if (targetOrderId) {
+    payment = await prisma.payment.findFirst({
+      where: { orderId: targetOrderId },
+      include: { order: true },
+    });
+  }
+
+  if (!payment && session.metadata?.paymentId) {
+    payment = await prisma.payment.findUnique({
+      where: { id: session.metadata.paymentId },
+      include: { order: true },
+    });
+  }
+
+  if (payment) {
+    await prisma.$transaction(async (tx) => {
+      await tx.payment.update({
+        where: { id: payment.id },
+        data: {
+          status: PaymentStatus.COMPLETED,
+          paidAt: new Date(),
+          providerResponse: {
+            ...(payment.providerResponse as object || {}),
+            sessionId: session.id,
+            paymentStatus: session.payment_status,
+            amount: session.amount_total,
+            currency: session.currency,
+          },
+        },
+      });
+
+      await tx.rentalOrder.update({
+        where: { id: payment.orderId },
+        data: { status: 'PAID' },
+      });
+    });
+  } else if (targetOrderId) {
+    await prisma.rentalOrder.update({
+      where: { id: targetOrderId },
+      data: { status: 'PAID' },
+    });
+  }
+
+  return { paid: true, session };
+};
+
 
 /**
  * Get user's payment history

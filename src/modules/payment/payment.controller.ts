@@ -249,6 +249,23 @@ export const confirmPayment = async (req: Request, res: Response): Promise<void>
   }
 };
 
+export const verifySession = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { sessionId, orderId } = req.body;
+    if (!sessionId) {
+      sendError(res, 400, 'Session ID is required');
+      return;
+    }
+
+    const result = await paymentService.verifySessionService(sessionId, orderId);
+    sendSuccess(res, 200, 'Payment session verified successfully', result);
+  } catch (error) {
+    console.error('Verify session error:', error);
+    sendError(res, 500, 'Failed to verify payment session', error instanceof Error ? error.message : 'An unexpected error occurred');
+  }
+};
+
+
 /**
  * @swagger
  * /api/payments:
