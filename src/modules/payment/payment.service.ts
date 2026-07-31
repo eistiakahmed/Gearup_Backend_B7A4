@@ -327,6 +327,18 @@ export const verifySessionService = async (
         where: { id: payment.orderId },
         data: { status: 'PAID' },
       });
+
+      // Cleanup any other leftover PENDING payment attempts for this order
+      await tx.payment.updateMany({
+        where: {
+          orderId: payment.orderId,
+          id: { not: payment.id },
+          status: PaymentStatus.PENDING,
+        },
+        data: {
+          status: PaymentStatus.FAILED,
+        },
+      });
     });
   } else if (targetOrderId) {
     await prisma.rentalOrder.update({
@@ -344,6 +356,42 @@ export const verifySessionService = async (
  */
 export const getUserPaymentsService = async (userId: string, filters: any) => {
   const { status, method, page = 1, limit = 20, sortBy = 'createdAt', sortOrder = 'desc' } = filters;
+
+  // Auto-sync any PENDING payments whose order status is already PAID, PICKED_UP, or RETURNED
+  await prisma.payment.updateMany({
+    where: {
+      userId,
+      status: PaymentStatus.PENDING,
+      order: {
+        status: {
+          in: ['PAID', 'PICKED_UP', 'RETURNED'],
+        },
+      },
+    },
+    data: {
+      status: PaymentStatus.COMPLETED,
+      paidAt: new Date(),
+    },
+  });
+
+  // Auto-expire old pending payments older than their expiration date
+  await prisma.payment.updateMany({
+    where: {
+      userId,
+      status: PaymentStatus.PENDING,
+      expiresAt: {
+        lt: new Date(),
+      },
+      order: {
+        status: {
+          notIn: ['PAID', 'PICKED_UP', 'RETURNED'],
+        },
+      },
+    },
+    data: {
+      status: PaymentStatus.FAILED,
+    },
+  });
 
   const skip = (page - 1) * limit;
 

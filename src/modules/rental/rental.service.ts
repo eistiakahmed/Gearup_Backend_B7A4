@@ -351,6 +351,20 @@ export const updateOrderStatusService = async (
   // Update gear stock based on status change
   await updateGearStockForOrder(orderId, status, existingOrder.status);
 
+  // Sync payments: If order is PAID, PICKED_UP, or RETURNED, ensure any PENDING payment record is set to COMPLETED
+  if (['PAID', 'PICKED_UP', 'RETURNED'].includes(status)) {
+    await prisma.payment.updateMany({
+      where: {
+        orderId,
+        status: OrderStatus.PLACED as any === 'PENDING' ? 'PENDING' : 'PENDING',
+      },
+      data: {
+        status: 'COMPLETED',
+        paidAt: new Date(),
+      },
+    });
+  }
+
   // Update order
   const updatedOrder = await prisma.rentalOrder.update({
     where: { id: orderId },
