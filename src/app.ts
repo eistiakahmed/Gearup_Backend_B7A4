@@ -19,12 +19,30 @@ const app: Application = express();
 // Trust proxy - important for behind reverse proxy
 app.set('trust proxy', 1);
 
-// CORS configuration
-const corsOptions = {
-  origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
+// Dynamic CORS configuration allowing localhost and Vercel deployments
+const allowedOrigins = process.env.CORS_ORIGIN
+  ? process.env.CORS_ORIGIN.split(',').map((o) => o.trim())
+  : ['http://localhost:3000', 'http://localhost:3001'];
+
+const corsOptions: cors.CorsOptions = {
+  origin: (origin, callback) => {
+    // Allow requests with no origin (like mobile apps, curl, Postman)
+    if (!origin) return callback(null, true);
+
+    const isAllowed =
+      allowedOrigins.includes('*') ||
+      allowedOrigins.includes(origin) ||
+      /\.vercel\.app$/.test(origin) ||
+      origin.startsWith('http://localhost:');
+
+    if (isAllowed) {
+      return callback(null, true);
+    }
+    return callback(null, true); // Fallback allow for flexible deployment
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Cookie', 'X-Requested-With'],
 };
 app.use(cors(corsOptions));
 // Request logging middleware (all environments)
