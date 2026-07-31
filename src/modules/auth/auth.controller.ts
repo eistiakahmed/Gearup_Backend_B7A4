@@ -124,6 +124,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
 
     sendSuccess(res, 201, 'User registered successfully', {
       user: result.user,
+      token: result.tokens?.accessToken,
     });
   } catch (error) {
     console.error('Registration error:', error);
@@ -232,6 +233,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
 
     sendSuccess(res, 200, 'Login successful', {
       user: result.user,
+      token: result.tokens?.accessToken,
     });
   } catch (error) {
     console.error('Login error:', error);
