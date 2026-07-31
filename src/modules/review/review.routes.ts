@@ -6,6 +6,7 @@ import {
   updateReview,
   deleteReview,
   getUserReviews,
+  getRecentReviews,
 } from './review.controller';
 import { createReviewValidation, reviewQueryValidation } from './review.validator';
 import { authenticate } from '../../middlewares/auth.middleware';
@@ -13,6 +14,13 @@ import { customerOnly } from '../../middlewares/role.middleware';
 import { handleValidationErrors } from '../../middlewares/validation.middleware';
 
 const router = Router();
+
+/**
+ * @route   GET /api/reviews/recent
+ * @desc    Get recent customer reviews across all gear
+ * @access  Public
+ */
+router.get('/recent', getRecentReviews);
 
 /**
  * @route   GET /api/reviews/gear/:gearId

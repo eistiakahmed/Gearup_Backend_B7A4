@@ -633,3 +633,21 @@ export const getUserReviews = async (req: RequestWithUser, res: Response): Promi
     }
   }
 };
+
+/**
+ * Get recent reviews (Public)
+ */
+export const getRecentReviews = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const limit = req.query.limit ? parseInt(req.query.limit as string) : 6;
+    const reviews = await reviewService.getRecentReviewsService(limit);
+    sendSuccess(res, 200, 'Recent reviews retrieved successfully', reviews);
+  } catch (error) {
+    console.error('Get recent reviews error:', error);
+    if (error instanceof Error) {
+      sendError(res, 500, 'Failed to retrieve recent reviews', error.message);
+    } else {
+      sendError(res, 500, 'Failed to retrieve recent reviews', 'An unexpected error occurred');
+    }
+  }
+};

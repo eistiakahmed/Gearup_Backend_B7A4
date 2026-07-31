@@ -321,3 +321,33 @@ export const getUserReviewsService = async (userId: string, filters: any) => {
     },
   };
 };
+
+/**
+ * Get recent customer reviews across all gear items
+ */
+export const getRecentReviewsService = async (limit: number = 6) => {
+  const reviews = await prisma.review.findMany({
+    take: limit,
+    include: {
+      user: {
+        select: {
+          id: true,
+          name: true,
+        },
+      },
+      gear: {
+        select: {
+          id: true,
+          name: true,
+          images: true,
+          brand: true,
+        },
+      },
+    },
+    orderBy: {
+      createdAt: 'desc',
+    },
+  });
+
+  return reviews;
+};
