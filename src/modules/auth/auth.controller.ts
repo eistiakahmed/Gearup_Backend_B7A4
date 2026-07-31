@@ -306,6 +306,11 @@ export const getCurrentUser = async (req: RequestWithUser, res: Response): Promi
   } catch (error) {
     console.error('Get current user error:', error);
     if (error instanceof Error) {
+      if (error.message.includes('not found')) {
+        res.clearCookie('accessToken');
+        sendError(res, 401, 'User account no longer exists. Please sign in again.', 'Session invalid');
+        return;
+      }
       sendError(res, 404, error.message);
     } else {
       sendError(res, 500, 'Failed to retrieve user', 'An unexpected error occurred');

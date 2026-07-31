@@ -109,9 +109,10 @@ app.use('/api/reviews', reviewRoutes);
 app.use('/api/provider', providerRoutes);
 app.use('/api/admin', adminRoutes);
 
-// Public Category Endpoint
+// Public Category Endpoints
 import { getAllCategories } from './modules/gear/gear.controller';
 app.get('/api/categories', getAllCategories);
+app.get('/api/categories/all', getAllCategories);
 
 // 404 handler - must be after all routes
 app.use((req: Request, res: Response) => {
